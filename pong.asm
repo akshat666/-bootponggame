@@ -10,19 +10,22 @@ ROWLENGTH equ 160       ; 80 chars * 2 bytes for each char
 PLAYERX equ 4           ; Player X position 
 CPUX equ 154
 KEY_W equ 0X11
-KEY_S equ 0X1f
+KEY_S equ 0X1F
 KEY_C equ 0X2E
 KEY_R equ 0X13
-SCREENH equ 80
-SCREENW equ 24
+SCREENH equ 25
+SCREENW equ 80
 PADDLEH equ 5
 
 ;;Variables
-drawColour: db 0xF0
-playerY: dw 10          ; Start player Y position 10 rows down
-cpuY: dw 10             ; Start cpu Y position 10 rows down
-ballX: dw 66            ; 
-ballY: dw 7             ; 
+drawColour:     db 0xF0
+playerY:        dw 10        ; Start player Y position 10 rows down
+cpuY:           dw 10        ; Start cpu Y position 10 rows down
+ballX:          dw 66        ; Ball X position 
+ballY:          dw 7         ; Ball Y position
+ballVeloX:      db -1        ; Ball velocity X
+ballVeloY:      db 1         ; Ball velocity Y
+
 
 ;; =================== LOGIC START ===================
 
@@ -69,22 +72,17 @@ game_loop:
     imul di, [cpuY], ROWLENGTH   ; Y positon is Y no of rows * length of row
     add di, CPUX
     mov cl, PADDLEH
+
     draw_cpu_loop:
         stosw
         add di, ROWLENGTH - 2 
         loop draw_cpu_loop
 
-    ;; Draw ball
-    imul di, [ballY], ROWLENGTH   ; Y positon is Y no of rows * length of row
-    add di, [ballX]
-    mov word [es:di], 0x2000
-    
-
 
     ;; Player input
     mov ah, 1
     int 0x16
-    jz move_cpu
+    jz move_cpu_up
 
     cbw                             ; Zero out AH in one byte
     int 0x16
@@ -98,30 +96,95 @@ game_loop:
     cmp ah, KEY_R
     je r_pressed
 
-    jmp move_cpu
+    jmp move_cpu_up
 
+    ;; Move paddle up
     w_pressed:
         dec word [playerY]
-        jge move_cpu
+        jge move_cpu_up
         inc word [playerY]
-        jmp move_cpu
+        jmp move_cpu_up
 
-
+    ;;Move paddle down
     s_pressed:
         cmp word [playerY], SCREENH - PADDLEH
-        jg move_cpu
+        jge move_cpu_up
         inc word [playerY]
-        jmp move_cpu
+        jmp move_cpu_up
 
 
+    ;; Change paddle and mid line colour
     c_pressed:
+        add byte [drawColour], 0x10
+        jmp move_cpu_up
 
-
+    ;; Reset game to initial values
     r_pressed:
+        int 0x19                    ; Relad the boot sector
+
 
 
     ;; Move CPU
-    move_cpu:
+    move_cpu_up:
+        mov bx, [cpuY]
+        cmp bx, [ballY]             ; CPU paddle top of ball ?
+        jle move_cpu_down           ; If yes, continue
+        dec word [cpuY]             ; No ? move cpu up
+        jnz move_ball
+        inc word [cpuY]             ; Cpu hit top area - come down
+
+    move_cpu_down:
+        add bx, PADDLEH
+        cmp bx, [ballY]             ; Bottom of CPU paddle below the ball ?
+        jge move_ball               ; Yes - continue
+        inc word [cpuY]             ; No? Move cpu down
+        cmp word [cpuY], 24         ; Cpu paddle at bottom ?
+        jl move_ball
+        dec word [cpuY]
+
+
+    ;; Draw ball
+    move_ball:
+        ;; Draw ball in current position
+        imul di, [ballY], ROWLENGTH   ; Y positon is Y no of rows * length of row
+        add di, [ballX]
+        mov word [es:di], 0x2020
+    
+        ; ;; Move ball to next position
+        mov bl, [ballVeloX]
+        add [ballX], bl
+        mov bl, [ballVeloY]
+        add [ballY], bl
+        
+    ;; Check hit top
+    check_hit_top:
+        cmp word [ballY], 0
+        jg check_hit_bottom
+        neg byte [ballVeloY]
+        jmp end_collision_checks
+
+    check_hit_bottom: 
+        cmp word [ballY], 25
+        jl check_hit_player
+        neg byte [ballVeloY]
+        jmp end_collision_checks
+
+    check_hit_player:
+        cmp word [ballX], PLAYERX
+        jne check_hit_cpu
+        mov bx, [playerY]
+        mov bx, [ballY]
+        jg check_hit_cpu
+        add bx, PADDLEH
+        cmp word bx, [ballY]
+        jl check_hit_cpu
+        neg byte [ballVeloX]
+
+    check_hit_cpu:
+
+
+    end_collision_checks:
+
 
 ;; Move ball
 
