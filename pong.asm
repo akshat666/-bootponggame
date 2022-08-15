@@ -25,7 +25,8 @@ ballX:          dw 66        ; Ball X position
 ballY:          dw 7         ; Ball Y position
 ballVeloX:      db -1        ; Ball velocity X
 ballVeloY:      db 1         ; Ball velocity Y
-
+playerscore:    db 0
+cpuscore:       db 0
 
 ;; =================== LOGIC START ===================
 
@@ -78,9 +79,20 @@ game_loop:
         add di, ROWLENGTH - 2 
         loop draw_cpu_loop
 
+    ;;Draw score
+    mov di, ROWLENGTH+66
+    mov bl, [playerscore]
+    add bl, 0x30                    ; ASCII number
+    mov bh, 0xE
+    mov [es:di], bx                 ; Draw player score
+
+    add di, 24
+    mov bl, [cpuscore]
+    add bl, 0x30
+    mov [es:di], bx
 
     ;; Player input
-    mov ah, 1
+    mov ah, 1                       ; BIOS keyboard status
     int 0x16
     jz move_cpu_up
 
@@ -161,13 +173,13 @@ game_loop:
         cmp word [ballY], 0
         jg check_hit_bottom
         neg byte [ballVeloY]
-        jmp end_collision_checks
+        jmp check_hit_left
 
     check_hit_bottom: 
         cmp word [ballY], 25
         jl check_hit_player
         neg byte [ballVeloY]
-        jmp end_collision_checks
+        jmp check_hit_left
 
     check_hit_player:
         cmp word [ballX], PLAYERX
@@ -179,9 +191,33 @@ game_loop:
         cmp word bx, [ballY]
         jl check_hit_cpu
         neg byte [ballVeloX]
+        jmp check_hit_left
 
     check_hit_cpu:
+        cmp word [ballX] , CPUX             ; Ball at cpu position ? 
+        jne check_hit_left            
+        mov bx, [cpuY]
+        cmp bx, [ballY]                     ; Top of cpu <= the ball?
+        jg check_hit_left                   ; No -> continue
+        add bx, PADDLEH
+        cmp word bx, [ballY]                ; Bottom of Cpu paddle >= the ball ?
+        jl check_hit_left                   ; No -> continue
+        neg byte [ballVeloX]                ; Yes -> hit cpu reverse ballX direction
 
+    check_hit_left:
+        cmp word [ballX], 0
+        jg check_hit_right
+        inc byte [cpuscore]
+        ;; check if cpu won
+        jmp end_collision_checks
+
+
+
+    check_hit_right:
+        cmp word [ballX], ROWLENGTH
+        jl end_collision_checks
+        inc byte [playerscore]
+        ;; check fi player won
 
     end_collision_checks:
 
