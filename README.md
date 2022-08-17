@@ -1,4 +1,4 @@
-# Pong game written in boot sector
+# Operating system written as a Pong game in boot sector
 
 # Size
 512 bytes
