@@ -1,7 +1,7 @@
 # Operating system written as a Pong game in boot sector
 
 No OS, no drivers — just x86 assembly and BIOS.
-512 bytes exactly. Boots in QEMU.Run it:
+512 bytes exactly. Boots in QEMU.
 
 # Size
 512 bytes
