@@ -12,5 +12,5 @@ nasm -f bin pong.asm -o boot.bin
 qemu-system-x86_64 boot.bin
 
 
-#Controls
+# Controls
 W/S (paddle), C (colors), R (reset)
